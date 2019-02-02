@@ -16,7 +16,7 @@
 }(function($) {
 	"use strict";
 
-	$.fn.multiTilts = function(_options) {
+	$.fn.tilts = function(_options) {
 		var requestAnimFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame || false;
 		var cancelAnimFrame = window.cancelAnimationFrame || window.mozCancelAnimationFrame || false;
 
@@ -81,16 +81,16 @@
 					_options[name].y = function(){return 0;};
 
 				var optionX = _options[name].x;
-				_options[name].x = function(){
-					var value = typeof optionX == 'function'? optionX() : optionX;
+				_options[name].x = function(properties){
+					var value = typeof optionX == 'function'? optionX.call(this, properties) : optionX;
 					if(name == 'distance')
 						value = value < 0? 0 : value;
 					return value;
 				};
 
 				var optionY = _options[name].y;
-				_options[name].y = function(){
-					var value = typeof optionY == 'function'? optionY() : optionY;
+				_options[name].y = function(properties){
+					var value = typeof optionY == 'function'? optionY.call(this, properties) : optionY;
 					if(name == 'distance')
 						value = value < 0? 0 : value;
 					return value;
@@ -114,14 +114,14 @@
 			}else{
 				var option = _options[name];
 				_options[name] = {
-					x: function(){
-						var value = typeof option == 'function'? option() : option;
+					x: function(properties){
+						var value = typeof option == 'function'? option.call(this, properties) : option;
 						if(name == 'distance')
 							value = value < 0? 0 : value;
 						return value;
 					},
-					y: function(){
-						var value = typeof option == 'function'? option() : option;
+					y: function(properties){
+						var value = typeof option == 'function'? option.call(this, properties) : option;
 						if(name == 'distance')
 							value = value < 0? 0 : value;
 						return value;
@@ -150,12 +150,12 @@
 
 
 		var _this = {destroyed: true, windowLeave: false};
-		var objTools = {
+		var tools = {
 			updateSizes: function(){
-				_objTools.eachMainElements(function() {
-					_objTools.updateData(this, 'width', _objTools.getNewSizes(this, 'width'));
-					_objTools.updateData(this, 'height', _objTools.getNewSizes(this, 'height'));
-					_objTools.updateData(this, 'xy', _objTools.getNewSizes(this, 'xy'));
+				_tools.eachEventElements(function() {
+					_tools.updateData(this, 'width', _tools.getNewSizes(this, 'width'));
+					_tools.updateData(this, 'height', _tools.getNewSizes(this, 'height'));
+					_tools.updateData(this, 'xy', _tools.getNewSizes(this, 'xy'));
 				});
 			},
 			destroy: function(reset){
@@ -173,11 +173,11 @@
 				$(window).off('mousemove', bindFunctins.mousemove);
 
 				if(reset)
-					_objTools.reset();
+					_tools.reset();
 
 				if(_options.speed || _options.delay)
 					if(!_options.customAnimation)
-						_objTools.eachMainElements(function(transformElement){
+						_tools.eachEventElements(function(transformElement){
 							transformElement.css({
 								'transition': '',
 							});
@@ -189,7 +189,7 @@
 				_this.destroyed = false;
 
 				$(window).resize(bindFunctins.resize);
-				_objTools.updateSizes();
+				_tools.updateSizes();
 
 				if(_options.disable)
 					$(document).on('mouseenter', _options.disable, bindFunctins.mouseenterPause);
@@ -203,14 +203,14 @@
 
 				if(_options.speed || _options.delay)
 					if(!_options.customAnimation)
-						_objTools.eachMainElements(function(transformElement){
-							_objTools.putTransition(transformElement, 'transform', _options.speed, _options.timingFunction, _options.delay);
+						_tools.eachEventElements(function(transformElement){
+							_tools.putTransition(transformElement, 'transform', _options.speed, _options.timingFunction, _options.delay);
 						});
 
 				return true;
 			},
 			reset: function(){
-				_objTools.eachMainElements(function(transformElement){
+				_tools.eachEventElements(function(transformElement){
 					transformElement.css({
 						'transform': '',
 					});
@@ -220,36 +220,36 @@
 				if(typeof el != 'undefined'){
 					if(!el.length)
 						return null;
-					return _objTools.updateData(el, 'pause', true);
+					return _tools.updateData(el, 'pause', true);
 				}
 
-				return _objTools.updateData(mainBlock, 'pause', true);
+				return _tools.updateData(mainBlock, 'pause', true);
 			},
 			play: function(el){
 				if(typeof el != 'undefined'){
 					if(!el.length)
 						return null;
-					return _objTools.updateData(el, 'pause', false);
+					return _tools.updateData(el, 'pause', false);
 				}
 
-				return _objTools.updateData(mainBlock, 'pause', false);
+				return _tools.updateData(mainBlock, 'pause', false);
 			},
 			puased: function(el){
 				if(typeof el != 'undefined'){
 					if(!el.length)
 						return null;
-					return _objTools.getData(el, 'pause');
+					return _tools.getData(el, 'pause');
 				}
 
-				return _objTools.getData(mainBlock, 'pause');
+				return _tools.getData(mainBlock, 'pause');
 			},
 		};
 		var savingDates = {};
-		var _objTools = {
-			getTransformElement: function(mainElement){
+		var _tools = {
+			getTransformElement: function(eventElement){
 				var transformElement = false;
 				if(_options.innerElement !== false)
-					transformElement = _options.innerElement? $(_options.innerElement, mainElement) : mainElement;
+					transformElement = _options.innerElement? $(_options.innerElement, eventElement) : eventElement;
 				if(_options.dependentElement){
 					if(transformElement === false){
 						transformElement = _options.dependentElement;
@@ -260,10 +260,10 @@
 
 				return transformElement;
 			},
-			eachMainElements: function(callback){
+			eachEventElements: function(callback){
 				mainBlock.each(function(index, element) {
 					var el = $(element);
-					var transformElement = _objTools.getTransformElement(el);
+					var transformElement = _tools.getTransformElement(el);
 					callback.call(el, transformElement);
 				});
 			},
@@ -334,13 +334,13 @@
 				if(name == 'height')
 					return el.outerHeight()
 				if(name == 'xy')
-					return _objTools.getElementOriginalPosition(el[0]);
+					return _tools.getElementOriginalPosition(el[0]);
 			},
 			getSize: function(el, name){
 				if(_options.realTimeUpdateResize){
-					return _objTools.getNewSizes(el, name);
+					return _tools.getNewSizes(el, name);
 				}else{
-					return _objTools.getData(el, name);
+					return _tools.getData(el, name);
 				}
 			},
 			updateData: function(el, name, value){
@@ -393,7 +393,7 @@
 				return !isString(axis) || (axis == xy);
 			},
 		};
-		$.extend(_objTools, objTools);
+		$.extend(_tools, tools);
 
 		var bindFunctins = {
 			mouseenterWindow: function(){
@@ -404,38 +404,38 @@
 			},
 
 			mouseenterPause: function(){
-				_objTools.pause();
+				_tools.pause();
 			},
 			mouseleavePlay: function(){
-				_objTools.play();
+				_tools.play();
 			},
 
 			resize: function(){
 				if(typeof bindFunctins.resize.setTimeoutID2 != 'undefined')
 					clearTimeout(bindFunctins.resize.setTimeoutID2);
 				bindFunctins.resize.setTimeoutID2 = setTimeout(function(){
-					_objTools.reset();
+					_tools.reset();
 				}, 100);
 				if(typeof bindFunctins.resize.setTimeoutID != 'undefined')
 					clearTimeout(bindFunctins.resize.setTimeoutID);
 				bindFunctins.resize.setTimeoutID = setTimeout(function(){
-					_objTools.updateSizes();
+					_tools.updateSizes();
 				}, 200);
 			},
 
 			mousemove: function(e) {
-				var mouse = _objTools.getMousePos(e);
+				var mouse = _tools.getMousePos(e);
 				var x = mouse.x;
 				var y = mouse.y;
-				_objTools.eachMainElements(function(transformElement){
-					var mainElement = this;
+				_tools.eachEventElements(function(transformElement){
+					var eventElement = this;
 
-					if(_objTools.puased(mainElement))
+					if(_tools.puased(eventElement))
 						return true;
 
-					var eW = _objTools.getSize(mainElement, 'width');
-					var eH = _objTools.getSize(mainElement, 'height');
-					var elementxy = _objTools.getSize(mainElement, 'xy');
+					var eW = _tools.getSize(eventElement, 'width');
+					var eH = _tools.getSize(eventElement, 'height');
+					var elementxy = _tools.getSize(eventElement, 'xy');
 					var left = elementxy.x;
 					var top = elementxy.y;
 
@@ -447,16 +447,22 @@
 					var absY = Math.abs(Y);
 					var EnterInX = absX <= eW / 2;
 					var EnterInY = absY <= eH / 2;
-					var PrevEnterIn = _objTools.getData(mainElement, '_EnterIn');
+					var PrevEnterIn = _tools.getData(eventElement, '_EnterIn');
 					var EnterIn = EnterInX && EnterInY;
-					_objTools.updateData(mainElement, '_EnterIn', EnterIn);
+					_tools.updateData(eventElement, '_EnterIn', EnterIn);
 
-					var DEGX = _options.rotation.x();
-					var DEGY = _options.rotation.y();
-					var DISX = _options.distance.x();
-					var DISY = _options.distance.y();
-					var TRSX = _options.translate.x();
-					var TRSY = _options.translate.y();
+					var properties = {
+						eventElement: eventElement,
+						el: transformElement,
+						options: _options,
+						mouse: {x: x, y: y},
+					};
+					var DEGX = _options.rotation.x.call(transformElement, properties);
+					var DEGY = _options.rotation.y.call(transformElement, properties);
+					var DISX = _options.distance.x.call(transformElement, properties);
+					var DISY = _options.distance.y.call(transformElement, properties);
+					var TRSX = _options.translate.x.call(transformElement, properties);
+					var TRSY = _options.translate.y.call(transformElement, properties);
 
 					// console.log(X, Y);
 
@@ -469,28 +475,28 @@
 					(function() {
 						if (EnterInX) {
 							percentX = (100 / eW * (X * 2));
-							if(_objTools.enableAxis(_options.rotation.axis, 'x'))
+							if(_tools.enableAxis(_options.rotation.axis, 'x'))
 								rotateX = DEGX / 100 * percentX;
 						} else {
 							var percent = (100 / DISX * (X - (X / absX * eW / 2)));
 							if (Math.abs(percent) > 100)
 								percent = percent > 0 ? 100 : -100;
 							percentX = ((100 * percent / Math.abs(percent)) - percent);
-							if(_objTools.enableAxis(_options.rotation.axis, 'x'))
+							if(_tools.enableAxis(_options.rotation.axis, 'x'))
 								rotateX = DEGX / 100 * percentX;
 						}
 					})();
 					(function() {
 						if (EnterInY) {
 							percentY = (100 / eH * (Y * 2));
-							if(_objTools.enableAxis(_options.rotation.axis, 'y'))
+							if(_tools.enableAxis(_options.rotation.axis, 'y'))
 								rotateY = DEGY / 100 * percentY;
 						} else {
 							var percent = (100 / DISY * (Y - (Y / absY * eH / 2)));
 							if (Math.abs(percent) > 100)
 								percent = percent > 0 ? 100 : -100;
 							percentY = ((100 * percent / Math.abs(percent)) - percent);
-							if(_objTools.enableAxis(_options.rotation.axis, 'y'))
+							if(_tools.enableAxis(_options.rotation.axis, 'y'))
 								rotateY = DEGY / 100 * percentY;
 						}
 					})();
@@ -539,10 +545,10 @@
 
 					/*distance*/
 					(function() {
-						if(_objTools.enableAxis(_options.rotation.axis, 'x')){
+						if(_tools.enableAxis(_options.rotation.axis, 'x')){
 							rotateX = distanceCalcX(rotateX);
 						}
-						if(_objTools.enableAxis(_options.rotation.axis, 'y')){
+						if(_tools.enableAxis(_options.rotation.axis, 'y')){
 							rotateY = distanceCalcY(rotateY);
 						}
 					})();
@@ -559,21 +565,21 @@
 
 					/*translate*/
 					var translateX = 0, translateY = 0;
-					if(_objTools.enableAxis(_options.translate.axis, 'x'))
+					if(_tools.enableAxis(_options.translate.axis, 'x'))
 						translateX = distanceCalcX(TRSX / 100 * percentX);
-					if(_objTools.enableAxis(_options.translate.axis, 'y'))
+					if(_tools.enableAxis(_options.translate.axis, 'y'))
 						translateY = distanceCalcY((TRSY / 100 * percentY) * (-1));
 
-					if(_objTools.enableAxis(_options.translate.axis, 'x') && _options.translate.reverse.x){
+					if(_tools.enableAxis(_options.translate.axis, 'x') && _options.translate.reverse.x){
 						translateX = translateX * (-1);
 					}
-					if(_objTools.enableAxis(_options.translate.axis, 'y') && _options.translate.reverse.y){
+					if(_tools.enableAxis(_options.translate.axis, 'y') && _options.translate.reverse.y){
 						translateY = translateY * (-1);
 					}
 					/*translate end*/
 
 					/* distance */
-					var prevDistancePercent = _objTools.getData(mainElement, 'distancePercent');
+					var prevDistancePercent = _tools.getData(eventElement, 'distancePercent');
 					var distancePercent = 100 / DISX * (absX - eW/2);
 					if (distancePercent < 0)
 						distancePercent = 0;
@@ -587,17 +593,17 @@
 					/*scale end*/
 
 					var text = '';
-					// for (var i = 1; i <= 60; i += 1) {
-					// 	var color = 'hsl('+ (360/60) * i +', 100%, 60%)';
-					// 	text += distanceCalcX(i / 100 * percentX) * (-1) + 'px ' + distanceCalcY(i / 100 * percentY) + 'px 0 ' + color + ', ';
-					// }
+					for (var i = 1; i <= 60; i += 10) {
+						var color = 'hsl('+ (360/60) * i +', 100%, 60%)';
+						text += distanceCalcX(i / 100 * percentX) * (-1) + 'px ' + distanceCalcY(i / 100 * percentY) + 'px 0 ' + color + ', ';
+					}
 					text += '0 0 0';
 
-					var properties = {
-						mainElement: mainElement,
-						el: transformElement,
-						options: _options,
-						mouse: {x: x, y: y},
+					properties = {
+						eventElement: properties.eventElement,
+						el: properties.el,
+						options: properties.options,
+						mouse: properties.mouse,
 						rotationX: rotateY,
 						rotationY: rotateX,
 						x: translateX,
@@ -608,112 +614,112 @@
 						distancePercent: distancePercent,
 						textShadow: text,
 					};
-					updateDates(mainElement, properties);
+					updateDates(eventElement, properties);
 
 					if(distancePercent){
-						build(mainElement, transformElement);
+						build(eventElement, transformElement);
 
 						if(typeof _options.distanceMousemove == 'function')
 							_options.distanceMousemove.call(transformElement, properties);
-						mainElement.trigger(_event_prefix + '.distanceMousemove');
+						// eventElement.trigger(_event_prefix + '.distanceMousemove');
 					}
 
 					if(distancePercent && distancePercent !== prevDistancePercent){ //enter
 						if(typeof _options.distanceMouseenter == 'function')
 							_options.distanceMouseenter.call(transformElement, properties);
-						mainElement.trigger(_event_prefix + '.distanceMouseenter');
+						// eventElement.trigger(_event_prefix + '.distanceMouseenter');
 					}
 
 					if(!distancePercent && distancePercent !== prevDistancePercent){ //leave
-						updateDates(mainElement, {});
-						build(mainElement, transformElement);
+						updateDates(eventElement, {});
+						build(eventElement, transformElement);
 
 						if(typeof _options.distanceMouseleave == 'function')
 							_options.distanceMouseleave.call(transformElement, properties);
-						mainElement.trigger(_event_prefix + '.distanceMouseleave');
+						// eventElement.trigger(_event_prefix + '.distanceMouseleave');
 					}
 
 					if(EnterIn){
 						if(typeof _options.mousemoveInside == 'function')
 							_options.mousemoveInside.call(transformElement, properties);
-						mainElement.trigger(_event_prefix + '.mousemoveInside');
+						// eventElement.trigger(_event_prefix + '.mousemoveInside');
 					}
 
 					if(typeof _options.mousemove == 'function')
 						_options.mousemove.call(transformElement, properties);
-					mainElement.trigger(_event_prefix + '.mousemove');
+					// eventElement.trigger(_event_prefix + '.mousemove');
 
 					if(EnterIn && EnterIn !== PrevEnterIn){ //enter
 						if(typeof _options.mouseenter == 'function')
 							_options.mouseenter.call(transformElement, properties);
-						mainElement.trigger(_event_prefix + '.mouseenter');
+						// eventElement.trigger(_event_prefix + '.mouseenter');
 					}
 					if(!EnterIn && EnterIn !== PrevEnterIn){ //leave
 						if(typeof _options.mouseleave == 'function')
 							_options.mouseleave.call(transformElement, properties);
-						mainElement.trigger(_event_prefix + '.mouseleave');
+						// eventElement.trigger(_event_prefix + '.mouseleave');
 					}
 				});
 
 			},
 		};
 
-		function updateDates(mainElement, date){
-			_objTools.updateData(mainElement, 'mouse', (!date.mouse? 0 : date.mouse));
-			_objTools.updateData(mainElement, 'rotateX', (!date.rotationX? 0 : date.rotationX));
-			_objTools.updateData(mainElement, 'rotateY', (!date.rotationY? 0 : date.rotationY));
-			_objTools.updateData(mainElement, 'translateX', (!date.x? 0 : date.x));
-			_objTools.updateData(mainElement, 'translateY', (!date.y? 0 : date.y));
-			_objTools.updateData(mainElement, 'scale', (!date.scale? 1 : date.scale));
-			_objTools.updateData(mainElement, 'percentX', (!date.percentX? 0 : date.percentX));
-			_objTools.updateData(mainElement, 'percentY', (!date.percentY? 0 : date.percentY));
-			_objTools.updateData(mainElement, 'distancePercent', (!date.distancePercent? 0 : date.distancePercent));
-			_objTools.updateData(mainElement, 'textShadow', (!date.textShadow? 0 : date.textShadow));
+		function updateDates(eventElement, date){
+			_tools.updateData(eventElement, 'mouse', (!date.mouse? 0 : date.mouse));
+			_tools.updateData(eventElement, 'rotateX', (!date.rotationX? 0 : date.rotationX));
+			_tools.updateData(eventElement, 'rotateY', (!date.rotationY? 0 : date.rotationY));
+			_tools.updateData(eventElement, 'translateX', (!date.x? 0 : date.x));
+			_tools.updateData(eventElement, 'translateY', (!date.y? 0 : date.y));
+			_tools.updateData(eventElement, 'scale', (!date.scale? 1 : date.scale));
+			_tools.updateData(eventElement, 'percentX', (!date.percentX? 0 : date.percentX));
+			_tools.updateData(eventElement, 'percentY', (!date.percentY? 0 : date.percentY));
+			_tools.updateData(eventElement, 'distancePercent', (!date.distancePercent? 0 : date.distancePercent));
+			_tools.updateData(eventElement, 'textShadow', (!date.textShadow? 0 : date.textShadow));
 		}
-		function getDates(mainElement, transformElement){
+		function getDates(eventElement, transformElement){
 			var properties = {
-				mainElement: mainElement,
+				eventElement: eventElement,
 				el: transformElement,
 				options: _options,
-				mouse: _objTools.getData(mainElement, 'mouse'),
-				rotationX: _objTools.getData(mainElement, 'rotateX'),
-				rotationY: _objTools.getData(mainElement, 'rotateY'),
-				x: _objTools.getData(mainElement, 'translateX'),
-				y: _objTools.getData(mainElement, 'translateY'),
-				percentX: _objTools.getData(mainElement, 'percentX'),
-				percentY: _objTools.getData(mainElement, 'percentY'),
-				distancePercent: _objTools.getData(mainElement, 'distancePercent'),
-				scale: _objTools.getData(mainElement, 'scale'),
-				textShadow: _objTools.getData(mainElement, 'textShadow'),
+				mouse: _tools.getData(eventElement, 'mouse'),
+				rotationX: _tools.getData(eventElement, 'rotateX'),
+				rotationY: _tools.getData(eventElement, 'rotateY'),
+				x: _tools.getData(eventElement, 'translateX'),
+				y: _tools.getData(eventElement, 'translateY'),
+				percentX: _tools.getData(eventElement, 'percentX'),
+				percentY: _tools.getData(eventElement, 'percentY'),
+				distancePercent: _tools.getData(eventElement, 'distancePercent'),
+				scale: _tools.getData(eventElement, 'scale'),
+				textShadow: _tools.getData(eventElement, 'textShadow'),
 			};
 
 			return properties;
 		}
 
-		function build(mainElement, transformElement){
+		function build(eventElement, transformElement){
 			if(requestAnimFrame){
-					if(!_objTools.getData(mainElement, 'requestAnimFrameStart')){
-						_objTools.updateData(mainElement, 'requestAnimFrameStart', true);
+					if(!_tools.getData(eventElement, 'requestAnimFrameStart')){
+						_tools.updateData(eventElement, 'requestAnimFrameStart', true);
 						(function requestFrame(){
 							var id = requestAnimFrame(requestFrame);
-							apply(mainElement, transformElement);
-							if(_this.windowLeave || !_objTools.getData(mainElement, 'distancePercent')){
+							apply(eventElement, transformElement);
+							if(_this.windowLeave || !_tools.getData(eventElement, 'distancePercent')){
 								cancelAnimFrame(id);
-								_objTools.updateData(mainElement, 'requestAnimFrameStart', false);
+								_tools.updateData(eventElement, 'requestAnimFrameStart', false);
 								if(_this.windowLeave){
-									updateDates(mainElement, {});
-									apply(mainElement, transformElement);
+									updateDates(eventElement, {});
+									apply(eventElement, transformElement);
 								}
 							}
 						})();
 					}
 			}else{
-				apply(mainElement, transformElement);
+				apply(eventElement, transformElement);
 			}
 		}
 
-		function apply(mainElement, transformElement){
-			var properties = getDates(mainElement, transformElement);
+		function apply(eventElement, transformElement){
+			var properties = getDates(eventElement, transformElement);
 
 			if(typeof _options.animationFrame == 'function')
 				_options.animationFrame.call(transformElement, properties);
@@ -725,19 +731,19 @@
 					return;
 
 				var transform = '';
-				if(_options.rotation.x && _objTools.enableAxis(_options.rotation.axis, 'x')){
+				if(_options.rotation.x && _tools.enableAxis(_options.rotation.axis, 'x')){
 					transform += 'rotateX(' + properties.rotationX + 'deg) ';
 				}
-				if(_options.rotation.y && _objTools.enableAxis(_options.rotation.axis, 'y')){
+				if(_options.rotation.y && _tools.enableAxis(_options.rotation.axis, 'y')){
 					transform += 'rotateY(' + properties.rotationY + 'deg) ';
 				}
 				if(_options.scale != 1){
 					transform += 'scale(' + properties.scale + ') ';
 				}
-				if(_options.translate.x && _objTools.enableAxis(_options.translate.axis, 'x')){
+				if(_options.translate.x && _tools.enableAxis(_options.translate.axis, 'x')){
 					transform += 'translateX(' + properties.x + 'px) ';
 				}
-				if(_options.translate.y && _objTools.enableAxis(_options.translate.axis, 'y')){
+				if(_options.translate.y && _tools.enableAxis(_options.translate.axis, 'y')){
 					transform += 'translateY(' + properties.y + 'px) ';
 				}
 
@@ -748,9 +754,9 @@
 			}
 		}
 
-		_objTools.restore();
+		_tools.restore();
 
-		return objTools;
+		return tools;
 	};
 
 	return $;

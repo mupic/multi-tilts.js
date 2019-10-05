@@ -25,9 +25,9 @@
 		var mainBlock = this;
 
 		_options = $.extend(true, {
-			innerElement: null, // '.inner-element', false - Do not transform the current main-element.
-			dependentElement: false, // '.dependent-element' - Will transform just like the main-element
-			disable: false, // '.disable-element' - Stop the animation if the mouse is on the element.
+			innerElement: null, //[Element || String] '.inner-element' - Animate this element, false - Do not animate the current element. Use with dependentElement
+			dependentElement: false, //[Element || String] '.dependent-element' - Additional element for animation
+			disable: false, // [String] '.disable-element' - Stop the animation if the mouse is on the element.
 			axis: true, //x || y
 			rotation: { //object{x,y} || number || function
 				x: 10, //number || function
@@ -51,12 +51,16 @@
 				x: false, //number || function
 				y: false, //number || function
 			},
+			width: false, //number > 0 || 'n%' > 0 || function //Will be calculated relative to the center of the element
+			height: false, //number > 0 || 'n%' > 0 || function //Will be calculated relative to the center of the element
 			scale: 1,
 			speed: 0, //seconds
 			delay: 0, //seconds
 			timingFunction: 'ease',
-			customAnimation: false, //true - animation not playing. Only event mode.
-			realTimeUpdateResize: false,
+			customAnimation: false, //true - disable animation. "Only event" mode
+			animationFrame: false, //function(obj){} - custom animation function
+			useRequestAnimationFrame: true, //use requestAnimationFrame or not
+			autoSizeUpdate: false, //int - how often will be updated (milliseconds). Calculate the size when moving the mouse
 			mousemoveInside: false, //function(obj){}
 			mousemove: false, //function(obj){}
 			mouseenter: false, //function(obj){}
@@ -64,7 +68,6 @@
 			distanceMousemove: false, //function(obj){}
 			distanceMouseleave: false, //function(obj){}
 			distanceMouseenter: false, //function(obj){}
-			animationFrame: false, //function(obj){}
 		}, _options);
 
 		var isObject = function(value){
@@ -73,7 +76,7 @@
 		var isString = function(value){
 			return typeof value === 'string';
 		}
-		var updateOptions = function(name){
+		var updateXYOptions = function(name){
 			if(isObject(_options[name])){
 				if(!_options[name].x)
 					_options[name].x = function(){return 0;};
@@ -142,9 +145,9 @@
 		if(!_options.dependentElement.length)
 			_options.dependentElement = false;
 
-		updateOptions('rotation');
-		updateOptions('translate');
-		updateOptions('distance');
+		updateXYOptions('rotation');
+		updateXYOptions('translate');
+		updateXYOptions('distance');
 
 		/* options end*/
 
@@ -153,9 +156,10 @@
 		var tools = {
 			updateSizes: function(){
 				_tools.eachEventElements(function() {
-					_tools.updateData(this, 'width', _tools.getNewSizes(this, 'width'));
-					_tools.updateData(this, 'height', _tools.getNewSizes(this, 'height'));
-					_tools.updateData(this, 'xy', _tools.getNewSizes(this, 'xy'));
+					var sizes = _tools.getNewSizes(this);
+					_tools.updateData(this, 'width', sizes.width);
+					_tools.updateData(this, 'height', sizes.height);
+					_tools.updateData(this, 'xy', {x: sizes.x, y: sizes.y});
 				});
 			},
 			destroy: function(reset){
@@ -166,22 +170,24 @@
 
 				$(document).off('mouseenter', bindFunctins.mouseenterPause);
 				$(document).off('mouseleave', bindFunctins.mouseleavePlay);
-			
-				$(window).off('mouseleave', bindFunctins.mouseleaveWindow);
+
+				$(window).off('mouseleave', bindFunctins._mouseleaveWindow);
 				$(window).off('mouseenter', bindFunctins.mouseenterWindow);
 
 				$(window).off('mousemove', bindFunctins.mousemove);
 
-				if(reset)
-					_tools.reset();
+				setTimeout(() => {
+					if(reset)
+						_tools.reset();
 
-				if(_options.speed || _options.delay)
-					if(!_options.customAnimation)
-						_tools.eachEventElements(function(transformElement){
-							transformElement.css({
-								'transition': '',
+					if(_options.speed || _options.delay)
+						if(!_options.customAnimation)
+							_tools.eachEventElements(function(transformElement){
+								transformElement.css({
+									'transition': '',
+								});
 							});
-						});
+				}, 10);
 			},
 			restore: function(){
 				if(!_this.destroyed)
@@ -191,13 +197,13 @@
 				$(window).resize(bindFunctins.resize);
 				_tools.updateSizes();
 
-				if(_options.disable)
+				if(typeof _options.disable == 'string')
 					$(document).on('mouseenter', _options.disable, bindFunctins.mouseenterPause);
-				if(_options.disable)
+				if(typeof _options.disable == 'string')
 					$(document).on('mouseleave', _options.disable, bindFunctins.mouseleavePlay);
 
-				$(window).on('mouseleave', bindFunctins.mouseleaveWindow);
-				$(window).on('mouseenter', bindFunctins.mouseenterWindow);
+				$(document).on('mouseleave', 'body', bindFunctins._mouseleaveWindow);
+				$(document).on('mouseenter', 'body', bindFunctins.mouseenterWindow);
 
 				$(window).mousemove(bindFunctins.mousemove);
 
@@ -211,9 +217,7 @@
 			},
 			reset: function(){
 				_tools.eachEventElements(function(transformElement){
-					transformElement.css({
-						'transform': '',
-					});
+					transformElement.css('transform', '');
 				});
 			},
 			pause: function(el){
@@ -269,45 +273,15 @@
 			},
 
 			getElementOriginalPosition: function(el){
-				var MainEl = el;
-				var xPos = 0;
-				var yPos = 0;
 
-				var hasFixed = false;
-				while (el) {
-					if(!hasFixed && getComputedStyle(el).position == 'fixed')
-						hasFixed = true;
-
-					if (el.tagName == "BODY") {
-						break;
-					} else {
-						// for all other non-BODY elements
-						xPos += (el.offsetLeft - el.scrollLeft + el.clientLeft);
-						yPos += (el.offsetTop - el.scrollTop + el.clientTop);
-					}
-					el = el.offsetParent;
-				}
-
-				var body = document.getElementsByTagName('body')[0];
-				// deal with browser quirks with body/window/document and page scroll
-				var xScroll = body.scrollLeft || document.documentElement.scrollLeft;
-				var yScroll = body.scrollTop || document.documentElement.scrollTop;
-				var bodyXY = {x: 0, y: 0};
-				if(!hasFixed){
-					bodyXY = body.getBoundingClientRect();
-					bodyXY.x = bodyXY.x + xScroll; //offset left
-					bodyXY.y = bodyXY.y + yScroll; //offset top
-
-					xScroll = 0;
-					yScroll = 0;
-				}
-
-				xPos += (body.offsetLeft + xScroll + body.clientLeft + bodyXY.x);
-				yPos += (body.offsetTop + yScroll + body.clientTop + bodyXY.y);
+				var obj = window.realSize(el);
+				var notTransform = obj.notTransform();
 
 				return {
-					x: xPos,
-					y: yPos
+					x: notTransform.minLeft[0],
+					y: notTransform.minTop[1],
+					width: notTransform.width,
+					height: notTransform.height,
 				};
 			},
 			getMousePos: function(e) {
@@ -328,24 +302,25 @@
 					y: posy
 				}
 			},
-			getNewSizes: function(el, name){
-				if(name == 'width')
-					return el.outerWidth();
-				if(name == 'height')
-					return el.outerHeight()
-				if(name == 'xy')
+			getNewSizes: function(el){
 					return _tools.getElementOriginalPosition(el[0]);
 			},
 			getSize: function(el, name){
-				if(_options.realTimeUpdateResize){
-					return _tools.getNewSizes(el, name);
+				if(_options.autoSizeUpdate >= 10){
+					var timeNow = new Date().getTime();
+					if(!_tools._timeUpdate || _tools._timeUpdate <= timeNow){
+						_tools._timeUpdate = timeNow + _options.autoSizeUpdate;
+						tools.updateSizes();
+					}
+
+					return _tools.getData(el, name);
 				}else{
 					return _tools.getData(el, name);
 				}
 			},
 			updateData: function(el, name, value){
 				if(!el[0][_prefix+'hash'])
-					el[0][_prefix+'hash'] = String(Date.now()) + String(Math.random());
+					el[0][_prefix+'hash'] = String(new Date().getTime()) + String(Math.random());
 
 				var hash = el[0][_prefix+'hash'];
 				if(savingDates[hash] == undefined)
@@ -399,6 +374,10 @@
 			mouseenterWindow: function(){
 				_this.windowLeave = false;
 			},
+			_mouseleaveWindow: function(e){
+				bindFunctins.mouseleaveWindow.call(this, e);
+				bindFunctins.mousemove.call(this, e);
+			},
 			mouseleaveWindow: function(){
 				_this.windowLeave = true;
 			},
@@ -428,16 +407,37 @@
 				var x = mouse.x;
 				var y = mouse.y;
 				_tools.eachEventElements(function(transformElement){
+					if(transformElement === false)
+						return false;
+
 					var eventElement = this;
 
 					if(_tools.puased(eventElement))
 						return true;
 
-					var eW = _tools.getSize(eventElement, 'width');
-					var eH = _tools.getSize(eventElement, 'height');
+					/* width and height <*/
+					var customWidth = typeof _options.width == 'function'? _options.width() : _options.width;
+					var customHeight = typeof _options.height == 'function'? _options.height() : _options.height;
+					var eW, eH;
+					var _eW = eW = Number(_tools.getSize(eventElement, 'width'));
+					var _eH = eH = Number(_tools.getSize(eventElement, 'height'));
+					if(customWidth && typeof customWidth == 'string' && customWidth.indexOf('%')){
+						_eW = eW / 100 * parseFloat(customWidth);
+					}else if(customWidth){
+						_eW = parseFloat(customWidth);
+					}
+					if(customHeight && typeof customHeight == 'string' && customHeight.indexOf('%')){
+						_eH = eH / 100 * parseFloat(customHeight);
+					}else if(customHeight){
+						_eH = parseFloat(customHeight);
+					}
+					/*> width and height */
+
 					var elementxy = _tools.getSize(eventElement, 'xy');
-					var left = elementxy.x;
-					var top = elementxy.y;
+					var left = elementxy.x - (_eW - eW) / 2;
+					var top = elementxy.y - (_eH - eH) / 2;
+					eW = _eW;
+					eH = _eH;
 
 					var CX = left + eW / 2;
 					var CY = top + eH / 2;
@@ -463,8 +463,6 @@
 					var DISY = _options.distance.y.call(transformElement, properties);
 					var TRSX = _options.translate.x.call(transformElement, properties);
 					var TRSY = _options.translate.y.call(transformElement, properties);
-
-					// console.log(X, Y);
 
 					var rotateX = 0,
 						rotateY = 0,
@@ -515,7 +513,6 @@
 							distancePercentX = (100 - distancePercentX);
 							value = value / 100 * distancePercentX;
 						}else if(EnterIn){
-							distancePercentX = 100;
 						}else{
 							value = 0;
 						}
@@ -535,7 +532,6 @@
 							distancePercentY = (100 - distancePercentY);
 							value = value / 100 * distancePercentY;
 						}else if(EnterIn){
-							distancePercentY = 100;
 						}else{
 							value = 0;
 						}
@@ -592,13 +588,6 @@
 					var scale = _options.scale != 1? 1 + ((_options.scale - 1) / 100 *  distancePercent) : 1;
 					/*scale end*/
 
-					var text = '';
-					for (var i = 1; i <= 60; i += 10) {
-						var color = 'hsl('+ (360/60) * i +', 100%, 60%)';
-						text += distanceCalcX(i / 100 * percentX) * (-1) + 'px ' + distanceCalcY(i / 100 * percentY) + 'px 0 ' + color + ', ';
-					}
-					text += '0 0 0';
-
 					properties = {
 						eventElement: properties.eventElement,
 						el: properties.el,
@@ -612,7 +601,6 @@
 						percentX: percentX,
 						percentY: percentY,
 						distancePercent: distancePercent,
-						textShadow: text,
 					};
 					updateDates(eventElement, properties);
 
@@ -665,7 +653,7 @@
 		};
 
 		function updateDates(eventElement, date){
-			_tools.updateData(eventElement, 'mouse', (!date.mouse? 0 : date.mouse));
+			_tools.updateData(eventElement, 'mouse', (!date.mouse? {x: 0, y: 0} : date.mouse));
 			_tools.updateData(eventElement, 'rotateX', (!date.rotationX? 0 : date.rotationX));
 			_tools.updateData(eventElement, 'rotateY', (!date.rotationY? 0 : date.rotationY));
 			_tools.updateData(eventElement, 'translateX', (!date.x? 0 : date.x));
@@ -674,7 +662,6 @@
 			_tools.updateData(eventElement, 'percentX', (!date.percentX? 0 : date.percentX));
 			_tools.updateData(eventElement, 'percentY', (!date.percentY? 0 : date.percentY));
 			_tools.updateData(eventElement, 'distancePercent', (!date.distancePercent? 0 : date.distancePercent));
-			_tools.updateData(eventElement, 'textShadow', (!date.textShadow? 0 : date.textShadow));
 		}
 		function getDates(eventElement, transformElement){
 			var properties = {
@@ -690,30 +677,31 @@
 				percentY: _tools.getData(eventElement, 'percentY'),
 				distancePercent: _tools.getData(eventElement, 'distancePercent'),
 				scale: _tools.getData(eventElement, 'scale'),
-				textShadow: _tools.getData(eventElement, 'textShadow'),
 			};
 
 			return properties;
 		}
 
 		function build(eventElement, transformElement){
-			if(requestAnimFrame){
-					if(!_tools.getData(eventElement, 'requestAnimFrameStart')){
-						_tools.updateData(eventElement, 'requestAnimFrameStart', true);
-						(function requestFrame(){
-							var id = requestAnimFrame(requestFrame);
-							apply(eventElement, transformElement);
-							if(_this.windowLeave || !_tools.getData(eventElement, 'distancePercent')){
-								cancelAnimFrame(id);
-								_tools.updateData(eventElement, 'requestAnimFrameStart', false);
-								if(_this.windowLeave){
-									updateDates(eventElement, {});
-									apply(eventElement, transformElement);
-								}
+			if(_options.useRequestAnimationFrame && requestAnimFrame){
+				if(!_tools.getData(eventElement, 'requestAnimFrameStart')){
+					_tools.updateData(eventElement, 'requestAnimFrameStart', true);
+					(function requestFrame(){
+						var id = requestAnimFrame(requestFrame);
+						apply(eventElement, transformElement);
+						if(_this.destroyed || _this.windowLeave || !_tools.getData(eventElement, 'distancePercent')){
+							cancelAnimFrame(id);
+							_tools.updateData(eventElement, 'requestAnimFrameStart', false);
+							if(_this.windowLeave){
+								updateDates(eventElement, {});
+								apply(eventElement, transformElement);
 							}
-						})();
-					}
+						}
+					})();
+				}
 			}else{
+				if(_this.windowLeave)
+					updateDates(eventElement, {});
 				apply(eventElement, transformElement);
 			}
 		}
@@ -749,7 +737,6 @@
 
 				transformElement.css({
 					'transform': transform,
-					'text-shadow': properties.textShadow,
 				});
 			}
 		}
